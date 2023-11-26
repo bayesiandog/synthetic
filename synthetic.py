@@ -8,6 +8,34 @@ import torch, torchvision
 import matplotlib.pyplot as plt
 
 
+
+def getROI(image, poly):
+    image_array = np.array(image)
+    # Black image except roi
+    mask = np.ones_like(image_array, dtype=np.uint8) * 255
+    cv.fillPoly(mask, poly, (0, 0, 0))
+    resultWhite = cv.bitwise_or(image_array, mask)
+    
+    new_mask = np.zeros_like(image)
+    cv.fillPoly(new_mask, poly, (255, 255, 255))
+    resultBlack = cv.bitwise_and(resultWhite, new_mask)
+    #cv.imshow("Black image except roi", resultBlack)
+    #cv.imshow("White image except roi", resultWhite)
+    #cv.waitKey(0)
+    return resultWhite, resultBlack
+
+def moveROI(pixels, resultWhite):    
+    white = np.ones_like(image_array, dtype=np.uint8) * 255
+    white[:, pixels:] = resultWhite[:, :-pixels]
+    return white
+
+def duplicate(image, poly, pixels):
+    poly[:, :, 0] += pixels
+    cv.fillPoly(image, [poly], (255, 255, 255))
+    final = cv.bitwise_and(image, moved)
+    cv.imshow("Translated ROI", final)
+    cv.waitKey(0)
+
 # Load the trained model
 models = YOLO('yolov8n-seg.pt')
 
@@ -37,43 +65,10 @@ for r in result:
     xy = np.array(r.masks.xy, dtype=int)
     
     image_array = np.array(image)
-    # Black image except roi
-    mask = np.ones_like(image_array, dtype=np.uint8) * 255
-    cv.fillPoly(mask, xy, (0, 0, 0))
-    resultWhite = cv.bitwise_or(image_array, mask)
+    resultWhite, resultBlack = getROI(image, xy)
+    moved = moveROI(100, resultWhite)
+    duplicate(image, xy, 100)
     
-    new_mask = np.zeros_like(image)
-    cv.fillPoly(new_mask, [xy], (255, 255, 255))
-    resultBlack = cv.bitwise_and(resultWhite, new_mask)
-    #cv.imshow("Black image except roi", resultBlack)
-    #cv.imshow("White image except roi", resultWhite)
-    #cv.waitKey(0)
-    
-    # Move roi
-    rows, cols, _ = image_array.shape
-    disp = 100
-    black = np.zeros_like(image)
-    black[:, disp:] = resultBlack[:, :-disp]
-    moved = black
-    #cv.imshow("Move roi", moved)
-    white = np.ones_like(image_array, dtype=np.uint8) * 255
-    white[:, disp:] = resultWhite[:, :-disp]
-    moved = white
-    #cv.imshow("Move roi white", moved)
-    #cv.waitKey(0)
-
-    
-    xy[:, :, 0] += 100
-    cv.fillPoly(image, [xy], (255, 255, 255))
-    final = cv.bitwise_and(image, moved)
-    cv.imshow("Translated ROI", final)
-    cv.waitKey(0)
-    '''
-    final = cv.bitwise_or(image, black)
-    cv.imshow("Translated ROI", final)
-    cv.waitKey(0)
-    '''
-
     new_boxes = [] #= torch.empty(1, 4, dtype = torch.float16)
     #print(r.boxes)
     nms = torchvision.ops.nms(boxes, r.boxes.conf, 0.9)
