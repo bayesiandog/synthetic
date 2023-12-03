@@ -18,7 +18,7 @@ class Synthesis(QMainWindow):
 
     def initUI(self):
         self.signals = WorkerSignals()
-        
+        self.img_ctr = 0
         self.setWindowTitle("Dataset Augmentation")
         self.setGeometry(100, 100, 2500, 1800)
         
@@ -38,12 +38,26 @@ class Synthesis(QMainWindow):
         self.button.clicked.connect(self.on_button_click)
         self.layout.addWidget(self.button)
         
+        
 
     def on_button_click(self):
         options = QFileDialog.Options()
         self.folder_path = QFileDialog.getExistingDirectory(self, "Choose dataset folder", options=options)
         if self.folder_path:
             print("Selected Folder:", self.folder_path)
+        file_list = os.listdir(self.folder_path)
+        
+        self.image_names = []
+        self.image_paths = []
+        # Iterate through the files and print their names
+        for file_name in file_list:
+            if file_name.lower().endswith(".jpg"):
+                image_path = os.path.join(self.folder_path, file_name)
+                self.image_paths.append(image_path)
+                image_namesjpg = [os.path.basename(file_name)]
+                self.image_names.append((image_namesjpg[0].split(".jpg"))[0])
+        
+        self.show_image(self.img_ctr)
 
     def show_logo(self, image_path):
         image = cv.imread(image_path)
