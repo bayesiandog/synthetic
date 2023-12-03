@@ -7,7 +7,14 @@ import cv2 as cv
 import torch, torchvision
 import matplotlib.pyplot as plt
 
+class Person:
+  def __init__(self, poly=None, name=None, age=None):
+    self.name = name
+    self.age = age
+    self.poly = np.array(poly, dtype=int)
+    
 
+    
 
 def getROI(image_array, poly):
     # Black image except roi
@@ -45,7 +52,7 @@ print(height, width)
 rimage = cv.resize(image, (640, 640), interpolation=cv.INTER_AREA)
 
 # Make predictions on the image
-result = models.predict(image, conf=0.9)
+result = models.predict(image, conf=0.3, classes=0)
 for r in result:
     im_array = r.plot()  # plot a BGR numpy array of predictions
     boxes = r.boxes   
@@ -54,16 +61,22 @@ for r in result:
     detection_counts = {r.names[dClass.item()]: (classes == dClass).sum() for dClass in dClasses}
     detections = '\n'.join(f"{count} {class_name}s" for class_name, count in detection_counts.items())    
     boxes = r.boxes.xyxy
-
+    
+    poly = np.array(r.masks.xy[2], dtype=int)
+    poly = [poly*2]
+    print(poly)   
+    person = []
+    for i in range(3):
+        person.append(Person(r.masks.xy[i]))
     # Duplicate
-    poly = np.array(r.masks.xy, dtype=int)   
+    #poly = np.array(r.masks.xy, dtype=int)
     image_array = np.array(image)
-    roi = getROI(image_array, poly)
+    roi = getROI(image_array, person[2].poly)
     moved = moveROI(image_array, 100, roi)
-    duplicate(image_array, poly, 100)
-
+    duplicate(image_array, person[2].poly, 100)
+    
     new_boxes = []
-    nms = torchvision.ops.nms(boxes, r.boxes.conf, 0.9)
+    nms = torchvision.ops.nms(boxes, r.boxes.conf, 0.1)
 
     imaged = Image.fromarray(cv.cvtColor(image, cv.COLOR_BGR2RGB))
 
@@ -87,16 +100,17 @@ for r in result:
             croppeds.append(cropped)
 
     for i, crop in enumerate(croppeds):
-        if i==2:
-            cv.imshow(f"New Crop {i}", crop)
-            cv.imwrite(f"{i}.jpg", crop)
-            #cv.waitKey(0)
-            print(i, y1, y2, x1, x2)
-            height, width, _ = crop.shape
-            print(height, width)
-            new_x1 = x1 + 100
-            new_x2 = x2 + 100
-            image[y1:y2, new_x1:new_x2] = crop
-            cv.imshow(f"Duplicate {i}", image)
-            
-            cv.waitKey(0)
+    
+        #cv.imshow(f"New Crop {i}", crop)
+        #cv.imwrite(f"{i}.jpg", crop)
+        #cv.waitKey(0)
+        '''
+        print(i, y1, y2, x1, x2)
+        height, width, _ = crop.shape
+        print(height, width)
+        new_x1 = x1 + 100
+        new_x2 = x2 + 100
+        image[y1:y2, new_x1:new_x2] = crop
+        cv.imshow(f"Duplicate {i}", image)
+        '''
+    #cv.waitKey(0)
