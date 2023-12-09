@@ -11,10 +11,7 @@ class Person:
   def __init__(self, poly=None, name=None, age=None):
     self.name = name
     self.age = age
-    self.poly = np.array(poly, dtype=int)
-    
-
-    
+    self.poly = np.array(poly, dtype=int)    
 
 def getROI(image_array, poly):
     # Black image except roi
