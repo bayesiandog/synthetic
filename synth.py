@@ -7,6 +7,12 @@ from PyQt5.QtGui import QImage, QPixmap, QKeySequence
 from PyQt5.QtCore import Qt, pyqtSignal, QObject
 
 
+class Poly:
+  def __init__(self, poly=None, name=None, age=None):
+    self.name = name
+    self.age = age
+    self.poly = np.array(poly, dtype=int)  
+    
 class WorkerSignals(QObject):
     connected = pyqtSignal(int)
 
@@ -139,9 +145,13 @@ class Synthesis(QMainWindow):
             q_image = QImage(self.image.data, self.width, self.height, self.bytes_per_line, QImage.Format_BGR888)
             pixmap = QPixmap.fromImage(q_image)
             self.image_label.setPixmap(pixmap)
-            print(self.polygon)
+            
+
             image_array = np.array(self.image)
             self.polygon = np.array([self.polygon], dtype=np.int32)
+            
+            
+
             roi = getROI(image_array, self.polygon)
             moved = moveROI(image_array, 100, roi)
             duplicate(image_array, self.polygon, 100, moved)
@@ -173,6 +183,8 @@ class Synthesis(QMainWindow):
     
         pixmap = QPixmap.fromImage(q_image)
         self.image_label.setPixmap(pixmap)
+
+        self.objects = []
 
 
 if __name__ == '__main__':
