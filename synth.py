@@ -63,6 +63,10 @@ class Synthesis(QMainWindow):
 
         #self.tab_widget = QTabWidget(self)
         #self.layout.addWidget(self.tab_widget)
+        
+        self.button = QPushButton('Choose dataset folder', self)
+        self.button.clicked.connect(self.on_button_click)
+        self.layout.addWidget(self.button)
 
         self.scroll_area = QScrollArea(self)
         self.scroll_area.setWidgetResizable(True)
@@ -154,9 +158,8 @@ class Synthesis(QMainWindow):
             q_image = QImage(self.imageCopy.data, self.width, self.height, self.bytes_per_line, QImage.Format_BGR888)
             pixmap = QPixmap.fromImage(q_image)
             self.image_label.setPixmap(pixmap)
-            self.polygon = []
+            #self.polygon = []
             
-
     def iterate_images(self):
         self.augment()
         self.img_ctr += 1
@@ -165,8 +168,9 @@ class Synthesis(QMainWindow):
 
     def augment(self):        
         image_array = np.array(self.image)
-        #self.polygon = np.array([self.polygon], dtype=np.int32)
+        self.polygon = np.array([self.polygon], dtype=np.int32)
         #self.get_boundaries(self.polygon)
+        
         roi = getROI(image_array, self.polygon)
         moved = moveROI(image_array, 100, roi)
         duplicate(image_array, self.polygon, 100, moved)
