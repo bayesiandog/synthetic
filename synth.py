@@ -33,14 +33,13 @@ def getROI(image_array, poly):
     cv.waitKey(0)
     return resultWhite
 
-def moveROI(image_array, pixels, resultWhite):    
-    disp = random.randint(0, 1)
+def moveROI(image_array, pixels, resultWhite, axis):    
     white = np.ones_like(image_array, dtype=np.uint8) * 255
-    if disp:
+    if axis:
         white[:, pixels:] = resultWhite[:, :-pixels]
     else:
         white[pixels:, :] = resultWhite[:-pixels, :]
-    return white, disp
+    return white
 
 def duplicate(image_array, poly, pixels, moved, axis):
     print(poly)
@@ -178,15 +177,15 @@ class Synthesis(QMainWindow):
         image_array = np.array(self.image)
         self.polygon = np.array([self.polygon], dtype=np.int32)
         for obj in self.objects:
-            disp = random.randint(1, 10) 
+            disp = random.randint(1, 50)
+            axis = random.randint(0, 1)
+            self.check_overlap(obj.poly, disp, axis)
             image_array = np.array(self.image)
-            list_of_arrays = obj.poly
-            roi = getROI(image_array, list_of_arrays)
-            moved, axis = moveROI(image_array, disp, roi)
-            self.image = duplicate(image_array, list_of_arrays, disp, moved, axis)
+            roi = getROI(image_array, obj.poly)
+            moved = moveROI(image_array, disp, roi, axis)
+            self.image = duplicate(image_array, obj.poly, disp, moved, axis)
             self.file_path = f"{self.image_paths[self.img_ctr].split('.jpg')[0]}"
             self.file_path += "A.jpg"
-            #print(self.file_path)
         cv.imwrite(self.file_path, self.image)
 
     def show_logo(self, image_path):
@@ -226,7 +225,13 @@ class Synthesis(QMainWindow):
         minX = np.min(poly[:, :, 0])
         minY = np.min(poly[:, :, 1])
         return maxX, maxY, minX, minY
+
+    def check_overlap(self, poly, disp, axis):
+        for obj in self.objects:
+            tobj = obj
+             
         
+
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     synthesis = Synthesis()
