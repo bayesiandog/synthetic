@@ -1,4 +1,5 @@
 import os
+import random
 import sys
 import cv2 as cv
 import numpy as np
@@ -19,7 +20,7 @@ class WorkerSignals(QObject):
 
 
 def getROI(image_array, poly):
-    print(poly)    
+    #print(poly)    
     mask = np.ones_like(image_array, dtype=np.uint8) * 255
     cv.fillPoly(mask, poly, (0, 0, 0))
     resultWhite = cv.bitwise_or(image_array, mask)
@@ -29,20 +30,29 @@ def getROI(image_array, poly):
     resultBlack = cv.bitwise_and(resultWhite, new_mask)
     #cv.imshow("Black image except roi", resultBlack)
     #cv.imshow("White image except roi", resultWhite)
-    #cv.waitKey(0)
+    cv.waitKey(0)
     return resultWhite
 
 def moveROI(image_array, pixels, resultWhite):    
+    disp = random.randint(0, 1)
     white = np.ones_like(image_array, dtype=np.uint8) * 255
-    white[:, pixels:] = resultWhite[:, :-pixels]
-    return white
+    if disp:
+        white[:, pixels:] = resultWhite[:, :-pixels]
+    else:
+        white[pixels:, :] = resultWhite[:-pixels, :]
+    return white, disp
 
-def duplicate(image_array, poly, pixels, moved):
-    poly[:, :, 0] += pixels
+def duplicate(image_array, poly, pixels, moved, axis):
+    print(poly)
+    if axis:
+        poly[:, :, 0] += pixels
+    else:
+        poly[:, :, 1] += pixels
     cv.fillPoly(image_array, [poly], (255, 255, 255))
     final = cv.bitwise_and(image_array, moved)
     cv.imshow("Translated ROI", final)
     cv.waitKey(0)
+    return final
 
 
 class Synthesis(QMainWindow):
@@ -79,10 +89,6 @@ class Synthesis(QMainWindow):
         self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
 
         self.show_logo("aa.jpg")
-
-        self.button = QPushButton('Choose dataset folder', self)
-        self.button.clicked.connect(self.on_button_click)
-        self.layout.addWidget(self.button)
 
         # Add a button to save anotations
         self.save_button = QPushButton("Save")
@@ -151,14 +157,16 @@ class Synthesis(QMainWindow):
             x = event.x()
             y = event.y()
             self.objects.append(Poly(self.polygon))
-            print(self.objects[self.objCounter].poly)
+
             maxX, maxY, minX, minY = self.get_boundaries(self.objects[self.objCounter].poly)
             self.objCounter += 1
+            
             cv.rectangle(self.imageCopy, (minX, minY), (maxX, maxY), (255, 0, 0), 2)
+            # TODO Store the boundaries in YOLO format for training
             q_image = QImage(self.imageCopy.data, self.width, self.height, self.bytes_per_line, QImage.Format_BGR888)
             pixmap = QPixmap.fromImage(q_image)
             self.image_label.setPixmap(pixmap)
-            #self.polygon = []
+            self.polygon = []
             
     def iterate_images(self):
         self.augment()
@@ -166,17 +174,19 @@ class Synthesis(QMainWindow):
         if self.img_ctr < len(self.image_paths):
             self.show_image(self.img_ctr)
 
-    def augment(self):        
+    def augment(self):
         image_array = np.array(self.image)
         self.polygon = np.array([self.polygon], dtype=np.int32)
-        #self.get_boundaries(self.polygon)
-        
-        roi = getROI(image_array, self.polygon)
-        moved = moveROI(image_array, 100, roi)
-        duplicate(image_array, self.polygon, 100, moved)
-        self.file_path = f"{self.image_paths[self.img_ctr].split('.jpg')[0]}"
-        self.file_path += "A.jpg"
-        print(self.file_path)
+        for obj in self.objects:
+            disp = random.randint(1, 10) 
+            image_array = np.array(self.image)
+            list_of_arrays = obj.poly
+            roi = getROI(image_array, list_of_arrays)
+            moved, axis = moveROI(image_array, disp, roi)
+            self.image = duplicate(image_array, list_of_arrays, disp, moved, axis)
+            self.file_path = f"{self.image_paths[self.img_ctr].split('.jpg')[0]}"
+            self.file_path += "A.jpg"
+            #print(self.file_path)
         cv.imwrite(self.file_path, self.image)
 
     def show_logo(self, image_path):
