@@ -19,40 +19,6 @@ class WorkerSignals(QObject):
     connected = pyqtSignal(int)
 
 
-def getROI(image_array, poly):
-    #print(poly)    
-    mask = np.ones_like(image_array, dtype=np.uint8) * 255
-    cv.fillPoly(mask, poly, (0, 0, 0))
-    resultWhite = cv.bitwise_or(image_array, mask)
-    
-    new_mask = np.zeros_like(image_array)
-    cv.fillPoly(new_mask, poly, (255, 255, 255))
-    resultBlack = cv.bitwise_and(resultWhite, new_mask)
-    #cv.imshow("Black image except roi", resultBlack)
-    #cv.imshow("White image except roi", resultWhite)
-    cv.waitKey(0)
-    return resultWhite
-
-def moveROI(image_array, pixels, resultWhite, axis):    
-    white = np.ones_like(image_array, dtype=np.uint8) * 255
-    if axis:
-        white[:, pixels:] = resultWhite[:, :-pixels]
-    else:
-        white[pixels:, :] = resultWhite[:-pixels, :]
-    return white
-
-def duplicate(image_array, poly, pixels, moved, axis):
-    print(poly)
-    if axis:
-        poly[:, :, 0] += pixels
-    else:
-        poly[:, :, 1] += pixels
-    cv.fillPoly(image_array, [poly], (255, 255, 255))
-    final = cv.bitwise_and(image_array, moved)
-    cv.imshow("Translated ROI", final)
-    cv.waitKey(0)
-    return final
-
 
 class Synthesis(QMainWindow):
     def __init__(self):
@@ -174,16 +140,23 @@ class Synthesis(QMainWindow):
             self.show_image(self.img_ctr)
 
     def augment(self):
-        image_array = np.array(self.image)
+        original_image_array = np.array(self.image)
         self.polygon = np.array([self.polygon], dtype=np.int32)
         for obj in self.objects:
-            disp = random.randint(1, 50)
             axis = random.randint(0, 1)
-            self.check_overlap(obj.poly, disp, axis)
+            maxX, maxY, minX, minY = self.get_boundaries(obj.poly)
+            if axis==0:
+                disp = random.randint(maxX - minX, maxX - minX + 100)
+            else:
+                disp = random.randint(maxY - minY, maxY - minY + 100)
+            
+            col, i= self.check_overlap(obj.poly, disp, axis)
+            print("col", col, i)
+            
             image_array = np.array(self.image)
-            roi = getROI(image_array, obj.poly)
-            moved = moveROI(image_array, disp, roi, axis)
-            self.image = duplicate(image_array, obj.poly, disp, moved, axis)
+            roi = self.getROI(original_image_array, obj.poly)
+            moved = self.moveROI(image_array, disp, roi, axis)
+            self.image = self.duplicate(image_array, obj.poly, disp, moved, axis)
             self.file_path = f"{self.image_paths[self.img_ctr].split('.jpg')[0]}"
             self.file_path += "A.jpg"
         cv.imwrite(self.file_path, self.image)
@@ -227,10 +200,47 @@ class Synthesis(QMainWindow):
         return maxX, maxY, minX, minY
 
     def check_overlap(self, poly, disp, axis):
-        for obj in self.objects:
-            tobj = obj
-             
+        col = 0
+        polyc = poly
+        polyc[:, :, axis] += disp
+        pmaxX, pmaxY, pminX, pminY = self.get_boundaries(polyc)
+        for i, obj in enumerate(self.objects):
+            maxX, maxY, minX, minY = self.get_boundaries(obj.poly)
+            xRange = range(minX, maxX)
+            yRange = range(minY, maxY)
+            if ((pminX in xRange) or (pmaxX in xRange)) and ((pminY in yRange) or (pmaxY in yRange)) :
+                col = 1
+                index = i
+        return col, index
+
+    def getROI(self, image_array, poly):
+        mask = np.ones_like(image_array, dtype=np.uint8) * 255
+        cv.fillPoly(mask, poly, (0, 0, 0))
+        resultWhite = cv.bitwise_or(image_array, mask)
         
+        new_mask = np.zeros_like(image_array)
+        cv.fillPoly(new_mask, poly, (255, 255, 255))
+        resultBlack = cv.bitwise_and(resultWhite, new_mask)
+        #cv.imshow("Black image except roi", resultBlack)
+        #cv.imshow("White image except roi", resultWhite)
+        cv.waitKey(0)
+        return resultWhite
+
+    def moveROI(self, image_array, pixels, resultWhite, axis):    
+        white = np.ones_like(image_array, dtype=np.uint8) * 255
+        if axis==0:
+            white[:, pixels:] = resultWhite[:, :-pixels]
+        else:
+            white[pixels:, :] = resultWhite[:-pixels, :]        
+        return white
+
+    def duplicate(self, image_array, poly, pixels, moved, axis):
+        poly[:, :, axis] += pixels
+        cv.fillPoly(image_array, [poly], (255, 255, 255))
+        final = cv.bitwise_and(image_array, moved)
+        cv.imshow("Translated ROI", final)
+        cv.waitKey(0)
+        return final
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
