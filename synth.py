@@ -143,16 +143,33 @@ class Synthesis(QMainWindow):
         original_image_array = np.array(self.image)
         self.polygon = np.array([self.polygon], dtype=np.int32)
         height, width, color = original_image_array.shape
-        print(height, width)
         for obj in self.objects:
             axis = random.randint(0, 1)
             dir = random.randint(0, 1)
             maxX, maxY, minX, minY = self.get_boundaries(obj.poly)
-            print(maxX, maxY, minX, minY)
+            
+            if (maxX > (width/2)) or (maxY > (height / 2)):
+                dir = 1
+
             if axis==0:
-                disp = random.randint(maxX - minX, (width - maxX))
+                if (width - maxX) < (maxX - minX):
+                    disp = random.randint(width - maxX, maxX - minX)
+                    print("1")
+                else:
+                    disp = random.randint(maxX - minX, width - maxX)
+                    print("2")
+                    if (width - maxX) > minX:
+                        disp = minX
             else:
-                disp = random.randint(maxY - minY, (height - maxY))
+                if (height - maxY) < (maxY - minY):
+                    disp = random.randint(height - maxY, maxY - minY)
+                    print("3")
+                else:
+                    disp = random.randint(maxY - minY, height - maxY)
+                    if (height - maxY) > minY:
+                        disp = minY
+                    print("4")
+                
             print(axis, dir, disp)
             col, i= self.check_overlap(obj.poly, disp, axis, dir)
             if col==-1:
