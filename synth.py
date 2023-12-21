@@ -142,23 +142,26 @@ class Synthesis(QMainWindow):
     def augment(self):
         original_image_array = np.array(self.image)
         self.polygon = np.array([self.polygon], dtype=np.int32)
+        height, width, color = original_image_array.shape
+        print(height, width)
         for obj in self.objects:
             axis = random.randint(0, 1)
+            dir = random.randint(0, 1)
             maxX, maxY, minX, minY = self.get_boundaries(obj.poly)
+            print(maxX, maxY, minX, minY)
             if axis==0:
-                disp = random.randint(maxX - minX, maxX - minX + 100)
+                disp = random.randint(maxX - minX, (width - maxX))
             else:
-                disp = random.randint(maxY - minY, maxY - minY + 100)
-            
-            col, i= self.check_overlap(obj.poly, disp, axis)
-            print("col", col, i)
-            
-            image_array = np.array(self.image)
-            roi = self.getROI(original_image_array, obj.poly)
-            moved = self.moveROI(image_array, disp, roi, axis)
-            self.image = self.duplicate(image_array, obj.poly, disp, moved, axis)
-            self.file_path = f"{self.image_paths[self.img_ctr].split('.jpg')[0]}"
-            self.file_path += "A.jpg"
+                disp = random.randint(maxY - minY, (height - maxY))
+            print(axis, dir, disp)
+            col, i= self.check_overlap(obj.poly, disp, axis, dir)
+            if col==-1:
+                image_array = np.array(self.image)
+                roi = self.getROI(original_image_array, obj.poly)
+                moved = self.moveROI(image_array, disp, roi, axis, dir )
+                self.image = self.duplicate(image_array, obj.poly, disp, moved, axis, dir)
+                self.file_path = f"{self.image_paths[self.img_ctr].split('.jpg')[0]}"
+                self.file_path += "A.jpg"
         cv.imwrite(self.file_path, self.image)
 
     def show_logo(self, image_path):
@@ -199,18 +202,25 @@ class Synthesis(QMainWindow):
         minY = np.min(poly[:, :, 1])
         return maxX, maxY, minX, minY
 
-    def check_overlap(self, poly, disp, axis):
-        col = 0
-        polyc = poly
-        polyc[:, :, axis] += disp
+    def check_overlap(self, poly, disp, axis, dir):
+        col = -1
+        index = -1
+        polyc = np.copy(poly)
+        if dir==0:
+            polyc[:, :, axis] += disp
+        else:
+            polyc[:, :, axis] -= disp
         pmaxX, pmaxY, pminX, pminY = self.get_boundaries(polyc)
         for i, obj in enumerate(self.objects):
             maxX, maxY, minX, minY = self.get_boundaries(obj.poly)
             xRange = range(minX, maxX)
             yRange = range(minY, maxY)
+            print(i, xRange, yRange)
+            print(pminX, pmaxX, pminY, pmaxY)
             if ((pminX in xRange) or (pmaxX in xRange)) and ((pminY in yRange) or (pmaxY in yRange)) :
                 col = 1
                 index = i
+            print("col", col, i)
         return col, index
 
     def getROI(self, image_array, poly):
@@ -226,20 +236,30 @@ class Synthesis(QMainWindow):
         cv.waitKey(0)
         return resultWhite
 
-    def moveROI(self, image_array, pixels, resultWhite, axis):    
+    def moveROI(self, image_array, pixels, resultWhite, axis, dir):
         white = np.ones_like(image_array, dtype=np.uint8) * 255
         if axis==0:
-            white[:, pixels:] = resultWhite[:, :-pixels]
+            if dir==0:
+                white[:, pixels:] = resultWhite[:, :-pixels]
+            else:
+                white[:, :-pixels] = resultWhite[:, pixels:]
         else:
-            white[pixels:, :] = resultWhite[:-pixels, :]        
+            if dir==0:
+                white[pixels:, :] = resultWhite[:-pixels, :]
+            else:
+                white[-pixels:, :] = resultWhite[:pixels, :]
         return white
 
-    def duplicate(self, image_array, poly, pixels, moved, axis):
-        poly[:, :, axis] += pixels
-        cv.fillPoly(image_array, [poly], (255, 255, 255))
+    def duplicate(self, image_array, poly, pixels, moved, axis, dir):
+        polyc = np.copy(poly)
+        if dir==0:
+            polyc[:, :, axis] += pixels
+        else:
+            polyc[:, :, axis] -= pixels
+        cv.fillPoly(image_array, [polyc], (255, 255, 255))
         final = cv.bitwise_and(image_array, moved)
-        cv.imshow("Translated ROI", final)
-        cv.waitKey(0)
+        #cv.imshow("Translated ROI", final)
+        #cv.waitKey(0)
         return final
 
 if __name__ == '__main__':
