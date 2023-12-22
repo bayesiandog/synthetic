@@ -252,7 +252,11 @@ class Synthesis(QMainWindow):
 
     def getROI(self, image_array, poly):
         mask = np.ones_like(image_array, dtype=np.uint8) * 255
-        cv.fillPoly(mask, poly, (0, 0, 0))
+        maxX, maxY, minX, minY = self.get_boundaries(poly)            
+        shift = [pair[i][0] + maxX for i, pair in enumerate(poly)]
+        #print(poly)
+        #print(shift)
+        cv.fillPoly(mask, shift, (0, 0, 0))
         resultWhite = cv.bitwise_or(image_array, mask)
         
         new_mask = np.zeros_like(image_array)
@@ -262,6 +266,8 @@ class Synthesis(QMainWindow):
         #cv.imshow("White image except roi", resultWhite)
         cv.waitKey(0)
         return resultWhite
+    #shift = [(pair[0] + 2, pair[1]) for pair in poly]
+
 
     def moveROI(self, image_array, pixels, resultWhite, axis, dir):
         white = np.ones_like(image_array, dtype=np.uint8) * 255
@@ -276,7 +282,7 @@ class Synthesis(QMainWindow):
             else:
                 white[:-pixels, :] = resultWhite[pixels:, :]
         #white = cv.flip(white, 1)
-        cv.imshow("Black image except roi", white)
+        cv.imshow("White image except roi", white)
         return white
 
     def duplicate(self, image_array, poly, pixels, moved, axis, dir):
