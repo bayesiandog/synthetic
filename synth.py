@@ -275,6 +275,8 @@ class Synthesis(QMainWindow):
                 white[pixels:, :] = resultWhite[:-pixels, :]
             else:
                 white[:-pixels, :] = resultWhite[pixels:, :]
+        #white = cv.flip(white, 1)
+        cv.imshow("Black image except roi", white)
         return white
 
     def duplicate(self, image_array, poly, pixels, moved, axis, dir):
