@@ -136,8 +136,12 @@ class Synthesis(QMainWindow):
     def iterate_images(self):
         self.augment()
         self.img_ctr += 1
-        if self.img_ctr < len(self.image_paths):
+        if self.img_ctr < len(self.image_paths):  
             self.show_image(self.img_ctr)
+        else:
+            self.show_logo("aa.jpg")
+            self.next_button.hide()
+
 
     def augment(self):
         original_image_array = np.array(self.image)
@@ -170,16 +174,21 @@ class Synthesis(QMainWindow):
                         disp = minY
                     print("4")
                 
-            print(axis, dir, disp)
+            print("axis", axis, dir, disp)
             col, i= self.check_overlap(obj.poly, disp, axis, dir)
             if col==-1:
                 image_array = np.array(self.image)
                 roi = self.getROI(original_image_array, obj.poly)
                 moved = self.moveROI(image_array, disp, roi, axis, dir )
-                self.image = self.duplicate(image_array, obj.poly, disp, moved, axis, dir)
-                self.file_path = f"{self.image_paths[self.img_ctr].split('.jpg')[0]}"
-                self.file_path += "A.jpg"
-        cv.imwrite(self.file_path, self.image)
+                self.image = self.duplicate(image_array, obj.poly, disp, moved, axis, dir)                                
+            else:
+                print("wtf is going on at this point")
+                continue
+        cv.imshow("Translated ROI", self.image)
+        cv.waitKey(0)
+        self.file_path = f"{self.image_paths[self.img_ctr].split('.jpg')[0]}"
+        self.file_path += "A.jpg"
+        #cv.imwrite(self.file_path, self.image)
 
     def show_logo(self, image_path):
         image = cv.imread(image_path)
@@ -193,6 +202,7 @@ class Synthesis(QMainWindow):
     
     def show_image(self, counter):                
         self.image = cv.imread(f'{self.image_paths[counter]}', cv.IMREAD_COLOR)
+        
         self.imageCopy = self.image.copy()
         self.height, self.width, self.channel = self.image.shape
         label_size = self.image_label.size()
@@ -234,7 +244,7 @@ class Synthesis(QMainWindow):
             yRange = range(minY, maxY)
             print(i, xRange, yRange)
             print(pminX, pmaxX, pminY, pmaxY)
-            if ((pminX in xRange) or (pmaxX in xRange)) and ((pminY in yRange) or (pmaxY in yRange)) :
+            if ((pminX in xRange) or (pmaxX in xRange)) and ((pminY in yRange) or (pmaxY in yRange)):
                 col = 1
                 index = i
             print("col", col, i)
@@ -264,7 +274,7 @@ class Synthesis(QMainWindow):
             if dir==0:
                 white[pixels:, :] = resultWhite[:-pixels, :]
             else:
-                white[-pixels:, :] = resultWhite[:pixels, :]
+                white[:-pixels, :] = resultWhite[pixels:, :]
         return white
 
     def duplicate(self, image_array, poly, pixels, moved, axis, dir):
