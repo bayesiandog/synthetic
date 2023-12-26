@@ -149,7 +149,12 @@ class Synthesis(QMainWindow):
         height, width, color = original_image_array.shape
         for obj in self.objects:
             axis = random.randint(0, 1)
+            flip = random.randint(0, 1)
             dir = random.randint(0, 1)
+            flip = 1
+            if flip:
+                obj.poly = np.array([[[width - x, y]  for x, y in row] for row in obj.poly])
+        
             maxX, maxY, minX, minY = self.get_boundaries(obj.poly)
             
             if (maxX > (width/2)) or (maxY > (height / 2)):
@@ -173,14 +178,14 @@ class Synthesis(QMainWindow):
                     if (height - maxY) > minY:
                         disp = minY
                     print("4")
-                
+            
             print("axis", axis, dir, disp)
             col, i= self.check_overlap(obj.poly, disp, axis, dir)
             if col:
                 image_array = np.array(self.image)
-                roi, poly = self.getROI(original_image_array, obj.poly)
+                roi= self.getROI(original_image_array, obj.poly, flip)
                 moved = self.moveROI(image_array, disp, roi, axis, dir )
-                self.image = self.duplicate(image_array, poly, disp, moved, axis, dir)                                
+                self.image = self.duplicate(image_array, obj.poly, disp, moved, axis, dir)                                
             else:
                 print("wtf is going on at this point")
                 continue
@@ -253,27 +258,27 @@ class Synthesis(QMainWindow):
     def normalize(self, value, min_val, max_val):
         return (value - min_val) / (max_val - min_val)
 
-
-    def getROI(self, image_array, poly):
+    def getROI(self, image_array, poly, flip):
+        if flip:
+            image_array = cv.flip(image_array, 1)
         mask = np.ones_like(image_array, dtype=np.uint8) * 255
-        maxX, maxY, minX, minY = self.get_boundaries(poly)            
+        maxX, maxY, minX, minY = self.get_boundaries(poly)
+        height, widths, color = image_array.shape
         width = maxX - minX
         middle = minX + width / 2
-        shift = np.array([[[maxX - int(width * (self.normalize(x, minX, maxX))), y]  for x, y in row] for row in poly])        
-        #print(shift)
-       
+        #shift = np.array([[[maxX - int(width * (self.normalize(x, minX, maxX))), y]  for x, y in row] for row in poly])        
         #shift = poly + [(maxX - minX), 0]
-
-        cv.fillPoly(mask, shift, (0, 0, 0))
+        
+        cv.fillPoly(mask, poly, (0, 0, 0))
         resultWhite = cv.bitwise_or(image_array, mask)
         
         #new_mask = np.zeros_like(image_array)
         #cv.fillPoly(new_mask, shift, (255, 255, 255))
         #resultBlack = cv.bitwise_and(resultWhite, new_mask)
         #cv.imshow("Black image except roi", resultBlack)
-        cv.imshow("White image except roi", resultWhite)
+        cv.imshow("resultWhite", resultWhite)
         cv.waitKey(0)
-        return resultWhite, shift
+        return resultWhite
 
     def moveROI(self, image_array, pixels, resultWhite, axis, dir):
         white = np.ones_like(image_array, dtype=np.uint8) * 255
@@ -287,17 +292,20 @@ class Synthesis(QMainWindow):
                 white[pixels:, :] = resultWhite[:-pixels, :]
             else:
                 white[:-pixels, :] = resultWhite[pixels:, :]
-        white = cv.flip(white, 1)
-        cv.imshow("moved", white)
+        #cv.imshow("white", white)
+        #white = cv.flip(white, 1)
+        cv.imshow("whiteflipped", white)
         cv.waitKey(0)
         return white
 
     def duplicate(self, image_array, poly, pixels, moved, axis, dir):
         polyc = np.copy(poly)
+        
         if dir==0:
             polyc[:, :, axis] += pixels
         else:
             polyc[:, :, axis] -= pixels
+        
         test = cv.fillPoly(image_array, [polyc], (255, 255, 255))
         final = cv.bitwise_and(image_array, moved)
         cv.imshow("test", test)
