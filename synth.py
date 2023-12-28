@@ -9,16 +9,16 @@ from PyQt5.QtCore import Qt, pyqtSignal, QObject
 
 
 class Poly:
-  def __init__(self, poly=None, name=None, age=None):
+  def __init__(self, poly=None, name=None, age=None, nump=None):
     self.name = name
     self.age = age
-    self.poly = np.array([poly], dtype=np.int32)
-    #self.poly = np.array(poly, dtype=int)  
-    
+    if nump==0:
+        self.poly = np.array([poly], dtype=np.int32)        
+    else:
+        self.poly = poly
+
 class WorkerSignals(QObject):
     connected = pyqtSignal(int)
-
-
 
 class Synthesis(QMainWindow):
     def __init__(self):
@@ -54,6 +54,12 @@ class Synthesis(QMainWindow):
         self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
 
         self.show_logo("aa.jpg")
+
+        self.anotation = QTextEdit()
+        self.anotation.setPlaceholderText("Enter class and press save.")
+        self.anotation.setFixedSize(100, 100)
+        self.layout.addWidget(self.anotation)
+        self.anotation.hide()
 
         # Add a button to save anotations
         self.save_button = QPushButton("Save")
@@ -119,12 +125,12 @@ class Synthesis(QMainWindow):
 
     def mouse_release(self, event):
         if event.button() == Qt.LeftButton:
-            x = event.x()
-            y = event.y()
-            self.objects.append(Poly(self.polygon))
+            xp = event.x()
+            yp = event.y()
+            self.polygon.append((xp, yp))
+            self.objects.append(Poly(self.polygon, nump=0))
 
             maxX, maxY, minX, minY = self.get_boundaries(self.objects[self.objCounter].poly)
-            self.objCounter += 1
             
             cv.rectangle(self.imageCopy, (minX, minY), (maxX, maxY), (255, 0, 0), 2)
             # TODO Store the boundaries in YOLO format for training
@@ -132,6 +138,37 @@ class Synthesis(QMainWindow):
             pixmap = QPixmap.fromImage(q_image)
             self.image_label.setPixmap(pixmap)
             self.polygon = []
+            self.anotate(self.objects[self.objCounter].poly)
+            self.objCounter += 1
+
+    def anotate(self, poly):
+        maxX, maxY, minX, minY = self.get_boundaries(poly)
+        a = self.anotation.toPlainText().strip()
+        b = next((object_class for object_class, name in d_classes.items() if name == a), None)        
+        
+        self.file_path = f"{self.image_paths[self.img_ctr].split('.jpg')[0]}"
+        self.file_path += ".txt"
+        if b==None:
+            return
+        if not os.path.exists(self.file_path):
+            open(self.file_path, 'x')
+        else:
+            print(f"{self.file_path} already exists.")
+
+        object_class_id = b[0]
+        x_center = (abs(maxX - minX) / 2) + minX
+        y_center = (abs(maxY - minY) / 2) + minY
+        x_center /= self.width  
+        y_center /= self.height 
+        
+        width = abs(maxX - minX) / self.width  
+        height = abs(maxY - minY) / self.height 
+        # Format the YOLO line for this object
+        yolo_line = f"{object_class_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}\n"
+        
+        with open (self.file_path,'a') as self.f:
+            self.f.write(yolo_line)
+            self.f.close()
             
     def iterate_images(self):
         self.augment()
@@ -142,7 +179,6 @@ class Synthesis(QMainWindow):
             self.show_logo("aa.jpg")
             self.next_button.hide()
 
-
     def augment(self):
         original_image_array = np.array(self.image)
         self.polygon = np.array([self.polygon], dtype=np.int32)
@@ -151,7 +187,7 @@ class Synthesis(QMainWindow):
             axis = random.randint(0, 1)
             flip = random.randint(0, 1)
             dir = random.randint(0, 1)
-            flip = 1
+            #flip = 0
             if flip:
                 obj.poly = np.array([[[width - x, y]  for x, y in row] for row in obj.poly])
         
@@ -163,29 +199,31 @@ class Synthesis(QMainWindow):
             if axis==0:
                 if (width - maxX) < (maxX - minX):
                     disp = random.randint(width - maxX, maxX - minX)
-                    print("1")
+                    #print("1")
                 else:
                     disp = random.randint(maxX - minX, width - maxX)
-                    print("2")
+                    #print("2")
                     if (width - maxX) > minX:
                         disp = minX
             else:
                 if (height - maxY) < (maxY - minY):
                     disp = random.randint(height - maxY, maxY - minY)
-                    print("3")
+                    #print("3")
                 else:
                     disp = random.randint(maxY - minY, height - maxY)
                     if (height - maxY) > minY:
                         disp = minY
-                    print("4")
+                    #print("4")
             
-            print("axis", axis, dir, disp)
+            #print("axis", axis, dir, disp)
             col, i= self.check_overlap(obj.poly, disp, axis, dir)
-            if col:
+            if col==-1:
                 image_array = np.array(self.image)
                 roi= self.getROI(original_image_array, obj.poly, flip)
-                moved = self.moveROI(image_array, disp, roi, axis, dir )
-                self.image = self.duplicate(image_array, obj.poly, disp, moved, axis, dir)                                
+                moved = self.moveROI(image_array, disp, roi, axis, dir)
+                self.image, poly = self.duplicate(image_array, obj.poly, disp, moved, axis, dir)
+                self.created_objects.append(Poly(poly, nump=1))
+                self.anotate(obj.poly)
             else:
                 print("wtf is going on at this point")
                 continue
@@ -223,9 +261,11 @@ class Synthesis(QMainWindow):
         pixmap = QPixmap.fromImage(q_image)
         self.image_label.setPixmap(pixmap)
         self.objects = []
+        self.created_objects = []
         self.objCounter = 0
         self.polygon = []
         self.next_button.show()
+        self.anotation.show()
 
     def get_boundaries(self, poly):
         maxX = np.max(poly[:, :, 0])
@@ -247,12 +287,19 @@ class Synthesis(QMainWindow):
             maxX, maxY, minX, minY = self.get_boundaries(obj.poly)
             xRange = range(minX, maxX)
             yRange = range(minY, maxY)
-            print(i, xRange, yRange)
-            print(pminX, pmaxX, pminY, pmaxY)
             if ((pminX in xRange) or (pmaxX in xRange)) and ((pminY in yRange) or (pmaxY in yRange)):
                 col = 1
                 index = i
             print("col", col, i)
+        
+        for i, obj in enumerate(self.created_objects):
+            maxX, maxY, minX, minY = self.get_boundaries(obj.poly)
+            xRange = range(minX, maxX)
+            yRange = range(minY, maxY)
+            if ((pminX in xRange) or (pmaxX in xRange)) and ((pminY in yRange) or (pmaxY in yRange)):
+                col = 1
+                index = i
+            print("col in created", col, i)
         return col, index
 
     def normalize(self, value, min_val, max_val):
@@ -276,8 +323,8 @@ class Synthesis(QMainWindow):
         #cv.fillPoly(new_mask, shift, (255, 255, 255))
         #resultBlack = cv.bitwise_and(resultWhite, new_mask)
         #cv.imshow("Black image except roi", resultBlack)
-        cv.imshow("resultWhite", resultWhite)
-        cv.waitKey(0)
+        #cv.imshow("resultWhite", resultWhite)
+        #cv.waitKey(0)
         return resultWhite
 
     def moveROI(self, image_array, pixels, resultWhite, axis, dir):
@@ -294,8 +341,8 @@ class Synthesis(QMainWindow):
                 white[:-pixels, :] = resultWhite[pixels:, :]
         #cv.imshow("white", white)
         #white = cv.flip(white, 1)
-        cv.imshow("whiteflipped", white)
-        cv.waitKey(0)
+        #cv.imshow("whiteflipped", white)
+        #cv.waitKey(0)
         return white
 
     def duplicate(self, image_array, poly, pixels, moved, axis, dir):
@@ -308,11 +355,16 @@ class Synthesis(QMainWindow):
         
         test = cv.fillPoly(image_array, [polyc], (255, 255, 255))
         final = cv.bitwise_and(image_array, moved)
-        cv.imshow("test", test)
-        cv.waitKey(0)
-        return final
+        #cv.imshow("test", test)
+        #cv.waitKey(0)
+        return final, polyc
 
 if __name__ == '__main__':
+    d_classes = {
+        "0": "mr",
+        "1": "nc",
+        "2": "wf"
+    }
     app = QApplication(sys.argv)
     synthesis = Synthesis()
     synthesis.show()
