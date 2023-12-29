@@ -157,8 +157,8 @@ class Synthesis(QMainWindow):
         object_class_id = b[0]
         x_center = (abs(maxX - minX) / 2) + minX
         y_center = (abs(maxY - minY) / 2) + minY
-        x_center /= self.width  
-        y_center /= self.height 
+        x_center /= self.width
+        y_center /= self.height
         
         width = abs(maxX - minX) / self.width  
         height = abs(maxY - minY) / self.height 
@@ -172,7 +172,7 @@ class Synthesis(QMainWindow):
     def iterate_images(self):
         self.augment()
         self.img_ctr += 1
-        if self.img_ctr < len(self.image_paths):  
+        if self.img_ctr < len(self.image_paths):
             self.show_image(self.img_ctr)
         else:
             self.show_logo("aa.jpg")
@@ -187,7 +187,7 @@ class Synthesis(QMainWindow):
             axis = random.randint(0, 1)
             flip = random.randint(0, 1)
             dir = random.randint(0, 1)
-            #flip = 0
+            
             if flip:
                 obj.poly = np.array([[[width - x, y]  for x, y in row] for row in obj.poly])
         
@@ -310,7 +310,7 @@ class Synthesis(QMainWindow):
         if flip:
             image_array = cv.flip(image_array, 1)
         mask = np.ones_like(image_array, dtype=np.uint8) * 255
-        maxX, maxY, minX, minY = self.get_boundaries(poly)
+        #maxX, maxY, minX, minY = self.get_boundaries(poly)
         #height, widths, color = image_array.shape
         #width = maxX - minX
         #middle = minX + width / 2
