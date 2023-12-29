@@ -179,55 +179,59 @@ class Synthesis(QMainWindow):
             self.next_button.hide()
 
     def augment(self):
-        original_image_array = np.array(self.image)
-        self.polygon = np.array([self.polygon], dtype=np.int32)
-        height, width, color = original_image_array.shape
-        self.created_objects_cnt = 0
-        for obj in self.objects:
-            axis = random.randint(0, 1)
-            flip = random.randint(0, 1)
-            dir = random.randint(0, 1)
-            
-            if flip:
-                obj.poly = np.array([[[width - x, y]  for x, y in row] for row in obj.poly])
-        
-            maxX, maxY, minX, minY = self.get_boundaries(obj.poly)
-            
-            if (maxX > (width/2)) or (maxY > (height / 2)):
-                dir = 1
+        for imageInd in range(5):
+            self.created_objects_cnt = 0
+            self.image = self.original_image
 
-            if axis==0:
-                if (width - maxX) < (maxX - minX):
-                    disp = random.randint(width - maxX, maxX - minX)
+            original_image_array = np.array(self.original_image)
+            self.polygon = np.array([self.polygon], dtype=np.int32)
+            height, width, color = original_image_array.shape    
+            for obj in self.objects:
+                axis = random.randint(0, 1)
+                flip = random.randint(0, 1)
+                dir = random.randint(0, 1)
+                poly = obj.poly
+                if flip:
+                    poly = np.array([[[width - x, y]  for x, y in row] for row in obj.poly])            
+                
+                maxX, maxY, minX, minY = self.get_boundaries(poly)
+                
+                if (maxX > (width/2)) or (maxY > (height / 2)):
+                    dir = 1
+
+                if axis==0:
+                    if (width - maxX) < (maxX - minX):
+                        disp = random.randint(width - maxX, maxX - minX)
+                    else:
+                        disp = random.randint(maxX - minX, width - maxX)
+                        if (width - maxX) > minX:
+                            disp = minX
                 else:
-                    disp = random.randint(maxX - minX, width - maxX)
-                    if (width - maxX) > minX:
-                        disp = minX
-            else:
-                if (height - maxY) < (maxY - minY):
-                    disp = random.randint(height - maxY, maxY - minY)                    
+                    if (height - maxY) < (maxY - minY):
+                        disp = random.randint(height - maxY, maxY - minY)                    
+                    else:
+                        disp = random.randint(maxY - minY, height - maxY)
+                        if (height - maxY) > minY:
+                            disp = minY
+                        
+                col, i= self.check_overlap(poly, disp, axis, dir)
+                if col==-1:                    
+                    image_array = np.array(self.image)
+                    roi = self.getROI(image_array, poly, flip)
+                    moved = self.moveROI(image_array, disp, roi, axis, dir)
+                    self.image, poly = self.duplicate(image_array, poly, disp, moved, axis,dir)
+                    self.created_objects.append(Poly(poly, anotation=obj.anotation, nump=1))
+                    self.anotate(self.created_objects[self.created_objects_cnt])
+                    self.created_objects_cnt += 1
                 else:
-                    disp = random.randint(maxY - minY, height - maxY)
-                    if (height - maxY) > minY:
-                        disp = minY
-                    
-            col, i= self.check_overlap(obj.poly, disp, axis, dir)
-            if col==-1:
-                image_array = np.array(self.image)
-                roi = self.getROI(original_image_array, obj.poly, flip)
-                moved = self.moveROI(image_array, disp, roi, axis, dir)
-                self.image, poly = self.duplicate(image_array, obj.poly, disp, moved, axis, dir)                
-                self.created_objects.append(Poly(poly, anotation=obj.anotation, nump=1))
-                self.anotate(self.created_objects[self.created_objects_cnt])
-                self.created_objects_cnt += 1
-            else:
-                print("collision")
-                continue
-        cv.imshow("Translated ROI", self.image)
-        cv.waitKey(0)
-        self.file_path = f"{self.image_paths[self.img_ctr].split('.jpg')[0]}"
-        self.file_path += "A.jpg"
-        #cv.imwrite(self.file_path, self.image)
+                    print("collision")
+                    continue
+            self.created_objects = []
+            #cv.imshow("Translated ROI", self.image)
+            #cv.waitKey(0)
+            self.file_path = f"{self.image_paths[self.img_ctr].split('.jpg')[0]}"
+            self.file_path += f"{imageInd}.jpg"
+            cv.imwrite(self.file_path, self.image)
 
     def show_logo(self, image_path):
         image = cv.imread(image_path)
@@ -240,16 +244,15 @@ class Synthesis(QMainWindow):
         self.image_label.setAlignment(Qt.AlignCenter)
     
     def show_image(self, counter):                
-        self.image = cv.imread(f'{self.image_paths[counter]}', cv.IMREAD_COLOR)
-        
-        self.imageCopy = self.image.copy()
+        self.image = cv.imread(f'{self.image_paths[counter]}', cv.IMREAD_COLOR)        
+        self.imageCopy = self.image.copy()        
         self.height, self.width, self.channel = self.image.shape
         label_size = self.image_label.size()
         
-        if (self.height < label_size.height()) or self.width < label_size.width(): 
+        if (self.height < label_size.height()) or self.width < label_size.width():
             self.imageCopy = cv.resize(self.imageCopy, (label_size.width(), label_size.height()))
             self.image = cv.resize(self.image, (label_size.width(), label_size.height()))
-
+        self.original_image = self.image.copy()
         self.height, self.width, self.channel = self.imageCopy.shape
         self.bytes_per_line = 3 * self.width
         q_image = QImage(self.imageCopy.data, self.width, self.height, self.bytes_per_line, QImage.Format_BGR888)
@@ -343,11 +346,8 @@ class Synthesis(QMainWindow):
         else:
             polyc[:, :, axis] -= pixels
         
-        test = cv.fillPoly(image_array, [polyc], (255, 255, 255))
+        cv.fillPoly(image_array, [polyc], (255, 255, 255))
         final = cv.bitwise_and(image_array, moved)
-        
-        #cv.imshow("test", test)
-        #cv.waitKey(0)
         return final, polyc
 
 if __name__ == '__main__':
