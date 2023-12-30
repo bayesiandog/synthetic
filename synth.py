@@ -85,7 +85,7 @@ class Synthesis(QMainWindow):
         options = QFileDialog.Options()
         self.folder_path = QFileDialog.getExistingDirectory(self, "Choose dataset folder", options=options)
         if self.folder_path:
-            print("Selected Folder:", self.folder_path)
+            #print("Selected Folder:", self.folder_path)
             file_list = os.listdir(self.folder_path)
             
             self.image_names = []
@@ -136,23 +136,23 @@ class Synthesis(QMainWindow):
             q_image = QImage(self.imageCopy.data, self.width, self.height, self.bytes_per_line, QImage.Format_BGR888)
             pixmap = QPixmap.fromImage(q_image)
             self.image_label.setPixmap(pixmap)
-            self.polygon = []
-            self.anotate(self.objects[self.objCounter])
+            self.polygon = []            
+            self.file_path = f"{self.image_paths[self.img_ctr].split('.jpg')[0]}"
+            self.file_path += ".txt"
+            self.anotate(self.objects[self.objCounter], self.file_path, 1)
             self.objCounter += 1
 
-    def anotate(self, polyObj):
+    def anotate(self, polyObj, file_path, original):
         maxX, maxY, minX, minY = self.get_boundaries(polyObj.poly)
-        anotation = polyObj.anotation #self.anotation.toPlainText().strip()
+        anotation = polyObj.anotation
         b = next((object_class for object_class, name in d_classes.items() if name == anotation), None)
-        
-        self.file_path = f"{self.image_paths[self.img_ctr].split('.jpg')[0]}"
-        self.file_path += ".txt"
+
         if b==None:
             return
-        if not os.path.exists(self.file_path):
-            open(self.file_path, 'x')
-        else:
-            print(f"{self.file_path} already exists.")
+        if not os.path.exists(file_path):
+            open(file_path, 'x')
+        #else:
+        #    print(f"{file_path} already exists.")
 
         object_class_id = b[0]
         x_center = (abs(maxX - minX) / 2) + minX
@@ -164,9 +164,16 @@ class Synthesis(QMainWindow):
         height = abs(maxY - minY) / self.height 
         # Format the YOLO line for this object
         yolo_line = f"{object_class_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}\n"
-        
-        with open (self.file_path,'a') as self.f:
+        if original:
+            self.original_anotation += yolo_line
+            
+        with open (file_path,'a') as self.f:
             self.f.write(yolo_line)
+            self.f.close()
+
+    def add_original_anotation(self, file_path):
+        with open (file_path,'a') as self.f:
+            self.f.write(self.original_anotation)
             self.f.close()
             
     def iterate_images(self):
@@ -178,14 +185,22 @@ class Synthesis(QMainWindow):
             self.show_logo("aa.jpg")
             self.next_button.hide()
 
+    def change_image(self, image, type):
+        image_array = np.array(image)
+        image_hsv = cv.cvtColor(image_array, cv.COLOR_BGR2HSV)
+        image_hsv[:, :, 1] += 300
+        image_hsv = np.clip(image_hsv, 0, 255)
+        image = cv.cvtColor(image_hsv, cv.COLOR_HSV2BGR)
+        return image
+
     def augment(self):
         for imageInd in range(5):
             self.created_objects_cnt = 0
             self.image = self.original_image
-
+            self.image = self.change_image(self.image, imageInd)
             original_image_array = np.array(self.original_image)
             self.polygon = np.array([self.polygon], dtype=np.int32)
-            height, width, color = original_image_array.shape    
+            height, width, color = original_image_array.shape
             for obj in self.objects:
                 axis = random.randint(0, 1)
                 flip = random.randint(0, 1)
@@ -194,8 +209,7 @@ class Synthesis(QMainWindow):
                 if flip:
                     poly = np.array([[[width - x, y]  for x, y in row] for row in obj.poly])            
                 
-                maxX, maxY, minX, minY = self.get_boundaries(poly)
-                
+                maxX, maxY, minX, minY = self.get_boundaries(poly)                
                 if (maxX > (width/2)) or (maxY > (height / 2)):
                     dir = 1
 
@@ -208,31 +222,34 @@ class Synthesis(QMainWindow):
                             disp = minX
                 else:
                     if (height - maxY) < (maxY - minY):
-                        disp = random.randint(height - maxY, maxY - minY)                    
+                        disp = random.randint(height - maxY, maxY - minY)
                     else:
                         disp = random.randint(maxY - minY, height - maxY)
                         if (height - maxY) > minY:
                             disp = minY
                         
-                col, i= self.check_overlap(poly, disp, axis, dir)
-                if col==-1:                    
+                col, i = self.check_overlap(poly, disp, axis, dir)
+                if col==-1:
                     image_array = np.array(self.image)
                     roi = self.getROI(image_array, poly, flip)
                     moved = self.moveROI(image_array, disp, roi, axis, dir)
                     self.image, poly = self.duplicate(image_array, poly, disp, moved, axis,dir)
                     self.created_objects.append(Poly(poly, anotation=obj.anotation, nump=1))
-                    self.anotate(self.created_objects[self.created_objects_cnt])
+                    self.file_path = f"{self.image_paths[self.img_ctr].split('.jpg')[0]}"
+                    self.file_path += f"{imageInd}.txt"            
+                    self.anotate(self.created_objects[self.created_objects_cnt], self.file_path, 0)
                     self.created_objects_cnt += 1
                 else:
-                    print("collision")
+                    print(f"{i} collision")
                     continue
             self.created_objects = []
-            #cv.imshow("Translated ROI", self.image)
-            #cv.waitKey(0)
             self.file_path = f"{self.image_paths[self.img_ctr].split('.jpg')[0]}"
             self.file_path += f"{imageInd}.jpg"
             cv.imwrite(self.file_path, self.image)
-
+            self.file_path = f"{self.image_paths[self.img_ctr].split('.jpg')[0]}"
+            self.file_path += f"{imageInd}.txt"
+            self.add_original_anotation(self.file_path)
+            
     def show_logo(self, image_path):
         image = cv.imread(image_path)
         image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
@@ -263,6 +280,7 @@ class Synthesis(QMainWindow):
         self.created_objects = []
         self.objCounter = 0
         self.polygon = []
+        self.original_anotation = ""
         self.next_button.show()
         self.anotation.show()
 
@@ -289,7 +307,7 @@ class Synthesis(QMainWindow):
             if ((pminX in xRange) or (pmaxX in xRange)) and ((pminY in yRange) or (pmaxY in yRange)):
                 col = 1
                 index = i
-            print("col", col, i)
+            #print("col", col, i)
         
         for i, obj in enumerate(self.created_objects):
             maxX, maxY, minX, minY = self.get_boundaries(obj.poly)
@@ -298,18 +316,19 @@ class Synthesis(QMainWindow):
             if ((pminX in xRange) or (pmaxX in xRange)) and ((pminY in yRange) or (pmaxY in yRange)):
                 col = 1
                 index = i
-            print("col in created", col, i)
+            #print("col in created", col, i)
         return col, index
 
     def normalize(self, value, min_val, max_val):
         return (value - min_val) / (max_val - min_val)
 
     def getROI(self, image_array, poly, flip):
+        '''
         image_hsv = cv.cvtColor(image_array, cv.COLOR_BGR2HSV)
         image_hsv[:, :, 1] += 300
         image_hsv = np.clip(image_hsv, 0, 255)
         image_array = cv.cvtColor(image_hsv, cv.COLOR_HSV2BGR)
-        
+        '''
         if flip:
             image_array = cv.flip(image_array, 1)
         mask = np.ones_like(image_array, dtype=np.uint8) * 255
