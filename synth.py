@@ -185,13 +185,30 @@ class Synthesis(QMainWindow):
             self.show_logo("aa.jpg")
             self.next_button.hide()
 
-    def change_image(self, image, type):
+    def change_image(self, image, augmentation_type):
         image_array = np.array(image)
         image_hsv = cv.cvtColor(image_array, cv.COLOR_BGR2HSV)
-        image_hsv[:, :, 1] += 300
+
+        if augmentation_type == 0:
+            image_hsv[:, :, 1] += 50  # Adjust the saturation for this type
+        elif augmentation_type == 1:
+            image_hsv[:, :, 2] += 50  # Adjust the brightness for this type
+        elif augmentation_type == 2:
+            # Example: Increase contrast by scaling the V channel
+            image_hsv[:, :, 2] = image_hsv[:, :, 2] * 1.5
+        elif augmentation_type == 3:
+            # Example: Custom augmentation 1
+            image_hsv[:, :, 1] -= 30
+        elif augmentation_type == 4:
+            # Example: Custom augmentation 2
+            image_hsv[:, :, 0] += 20
+        else:
+            raise ValueError("Invalid augmentation type")
+
         image_hsv = np.clip(image_hsv, 0, 255)
-        image = cv.cvtColor(image_hsv, cv.COLOR_HSV2BGR)
-        return image
+        augmented_image = cv.cvtColor(image_hsv, cv.COLOR_HSV2BGR)
+        
+        return augmented_image
 
     def augment(self):
         for imageInd in range(5):
@@ -202,46 +219,44 @@ class Synthesis(QMainWindow):
             self.polygon = np.array([self.polygon], dtype=np.int32)
             height, width, color = original_image_array.shape
             for obj in self.objects:
-                axis = random.randint(0, 1)
-                flip = random.randint(0, 1)
-                dir = random.randint(0, 1)
-                poly = obj.poly
-                if flip:
-                    poly = np.array([[[width - x, y]  for x, y in row] for row in obj.poly])            
-                
-                maxX, maxY, minX, minY = self.get_boundaries(poly)                
-                if (maxX > (width/2)) or (maxY > (height / 2)):
-                    dir = 1
-
-                if axis==0:
-                    if (width - maxX) < (maxX - minX):
-                        disp = random.randint(width - maxX, maxX - minX)
+                while True:
+                    axis = random.randint(0, 1)
+                    flip = 1
+                    dir = random.randint(0, 1)
+                    poly = obj.poly
+                    if flip:
+                        poly = np.array([[[width - x, y]  for x, y in row] for row in obj.poly])          
+                    maxX, maxY, minX, minY = self.get_boundaries(poly)                
+                    if (maxX > (width/2)) or (maxY > (height / 2)):
+                        dir = 1
+                    if axis==0:
+                        if (width - maxX) < (maxX - minX):
+                            disp = random.randint(width - maxX, maxX - minX)
+                        else:
+                            disp = random.randint(maxX - minX, width - maxX)
+                            if (width - maxX) > minX:
+                                disp = minX
                     else:
-                        disp = random.randint(maxX - minX, width - maxX)
-                        if (width - maxX) > minX:
-                            disp = minX
-                else:
-                    if (height - maxY) < (maxY - minY):
-                        disp = random.randint(height - maxY, maxY - minY)
+                        if (height - maxY) < (maxY - minY):
+                            disp = random.randint(height - maxY, maxY - minY)
+                        else:
+                            disp = random.randint(maxY - minY, height - maxY)
+                            if (height - maxY) > minY:
+                                disp = minY
+                    col, i = self.check_overlap(poly, disp, axis, dir)
+                    if col==-1:
+                        image_array = np.array(self.image)
+                        roi = self.getROI(image_array, poly, flip)
+                        moved = self.moveROI(image_array, disp, roi, axis, dir)
+                        self.image, poly = self.duplicate(image_array, poly, disp, moved, axis,dir)
+                        self.created_objects.append(Poly(poly, anotation=obj.anotation, nump=1))
+                        self.file_path = f"{self.image_paths[self.img_ctr].split('.jpg')[0]}"
+                        self.file_path += f"{imageInd}.txt"            
+                        self.anotate(self.created_objects[self.created_objects_cnt], self.file_path, 0)
+                        self.created_objects_cnt += 1
+                        break
                     else:
-                        disp = random.randint(maxY - minY, height - maxY)
-                        if (height - maxY) > minY:
-                            disp = minY
-                        
-                col, i = self.check_overlap(poly, disp, axis, dir)
-                if col==-1:
-                    image_array = np.array(self.image)
-                    roi = self.getROI(image_array, poly, flip)
-                    moved = self.moveROI(image_array, disp, roi, axis, dir)
-                    self.image, poly = self.duplicate(image_array, poly, disp, moved, axis,dir)
-                    self.created_objects.append(Poly(poly, anotation=obj.anotation, nump=1))
-                    self.file_path = f"{self.image_paths[self.img_ctr].split('.jpg')[0]}"
-                    self.file_path += f"{imageInd}.txt"            
-                    self.anotate(self.created_objects[self.created_objects_cnt], self.file_path, 0)
-                    self.created_objects_cnt += 1
-                else:
-                    print(f"{i} collision")
-                    continue
+                        continue                        
             self.created_objects = []
             self.file_path = f"{self.image_paths[self.img_ctr].split('.jpg')[0]}"
             self.file_path += f"{imageInd}.jpg"
