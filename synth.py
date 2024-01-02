@@ -222,27 +222,28 @@ class Synthesis(QMainWindow):
                 while True:
                     axis = random.randint(0, 1)
                     flip = 1
-                    dir = random.randint(0, 1)
+                    dir = 0 #random.randint(0, 1)
                     poly = obj.poly
                     if flip:
                         poly = np.array([[[width - x, y]  for x, y in row] for row in obj.poly])          
                     maxX, maxY, minX, minY = self.get_boundaries(poly)                
-                    if (maxX > (width/2)) or (maxY > (height / 2)):
+                    if (maxX > (width/2)) and axis==0:
                         dir = 1
+                    
+                    if (maxY > (height / 2)) and axis==1:
+                        dir = 1
+                    
                     if axis==0:
-                        if (width - maxX) < (maxX - minX):
-                            disp = random.randint(width - maxX, maxX - minX)
-                        else:
+                        if dir:
                             disp = random.randint(maxX - minX, width - maxX)
-                            if (width - maxX) > minX:
-                                disp = minX
-                    else:
-                        if (height - maxY) < (maxY - minY):
-                            disp = random.randint(height - maxY, maxY - minY)
                         else:
+                            disp = random.randint(maxX - minX, maxX)
+                    else:
+                        if dir:
                             disp = random.randint(maxY - minY, height - maxY)
-                            if (height - maxY) > minY:
-                                disp = minY
+                        else:
+                            disp = random.randint(maxY - minY, maxY)
+                    print(maxX, maxY, minX, minY, dir, disp)
                     col, i = self.check_overlap(poly, disp, axis, dir)
                     if col==-1:
                         image_array = np.array(self.image)
