@@ -232,18 +232,18 @@ class Synthesis(QMainWindow):
                     
                     if (maxY > (height / 2)) and axis==1:
                         dir = 1
-                    
+                        
                     if axis==0:
                         if dir:
-                            disp = random.randint(maxX - minX, width - maxX)
-                        else:
                             disp = random.randint(maxX - minX, maxX)
+                        else:
+                            disp = random.randint(maxX - minX, width - maxX - maxX - minX)                            
                     else:
                         if dir:
-                            disp = random.randint(maxY - minY, height - maxY)
-                        else:
                             disp = random.randint(maxY - minY, maxY)
-                    print(maxX, maxY, minX, minY, dir, disp)
+                        else:
+                            disp = random.randint(maxY - minY, (height - maxY) - maxY - minY)
+                            
                     col, i = self.check_overlap(poly, disp, axis, dir)
                     if col==-1:
                         image_array = np.array(self.image)
