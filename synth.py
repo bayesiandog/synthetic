@@ -232,17 +232,19 @@ class Synthesis(QMainWindow):
                     
                     if (maxY > (height / 2)) and axis==1:
                         dir = 1
-                        
+
                     if axis==0:
+                        num_fits = (minX // (maxX - minX)) - 1
                         if dir:
-                            disp = random.randint(maxX - minX, maxX)
+                            disp = random.randint(maxX - minX, num_fits * (maxX - minX))
                         else:
-                            disp = random.randint(maxX - minX, width - maxX - maxX - minX)                            
+                            disp = random.randint(maxX - minX, width - maxX - minX)                            
                     else:
+                        num_fits = (minY // (maxY - minY)) - 1
                         if dir:
-                            disp = random.randint(maxY - minY, maxY)
+                            disp = random.randint(maxY - minY, num_fits * (maxX - minX))
                         else:
-                            disp = random.randint(maxY - minY, (height - maxY) - maxY - minY)
+                            disp = random.randint(maxY - minY, height - maxY - minY)
                             
                     col, i = self.check_overlap(poly, disp, axis, dir)
                     if col==-1:
