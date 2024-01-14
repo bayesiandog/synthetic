@@ -222,7 +222,7 @@ class Synthesis(QMainWindow):
                 while True:
                     axis = random.randint(0, 1)
                     flip = 1
-                    dir = 0 #random.randint(0, 1)
+                    dir = 0
                     poly = obj.poly
                     if flip:
                         poly = np.array([[[width - x, y]  for x, y in row] for row in obj.poly])          
