@@ -190,17 +190,14 @@ class Synthesis(QMainWindow):
         image_hsv = cv.cvtColor(image_array, cv.COLOR_BGR2HSV)
 
         if augmentation_type == 0:
-            image_hsv[:, :, 1] += 50  # Adjust the saturation for this type
+            image_hsv[:, :, 1] += 50  # Adjust the saturation
         elif augmentation_type == 1:
-            image_hsv[:, :, 2] += 50  # Adjust the brightness for this type
-        elif augmentation_type == 2:
-            # Example: Increase contrast by scaling the V channel
+            image_hsv[:, :, 2] += 50  # Adjust the brightness
+        elif augmentation_type == 2:  # Adjust the contrast            
             image_hsv[:, :, 2] = image_hsv[:, :, 2] * 1.5
         elif augmentation_type == 3:
-            # Example: Custom augmentation 1
             image_hsv[:, :, 1] -= 30
         elif augmentation_type == 4:
-            # Example: Custom augmentation 2
             image_hsv[:, :, 0] += 20
         else:
             raise ValueError("Invalid augmentation type")
