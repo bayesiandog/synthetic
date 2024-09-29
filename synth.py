@@ -132,7 +132,7 @@ class Synthesis(QMainWindow):
             maxX, maxY, minX, minY = self.get_boundaries(self.objects[self.objCounter].poly)
             
             cv.rectangle(self.imageCopy, (minX, minY), (maxX, maxY), (255, 0, 0), 2)
-            # TODO Store the boundaries in YOLO format for training
+            
             q_image = QImage(self.imageCopy.data, self.width, self.height, self.bytes_per_line, QImage.Format_BGR888)
             pixmap = QPixmap.fromImage(q_image)
             self.image_label.setPixmap(pixmap)
